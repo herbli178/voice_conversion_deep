@@ -10,6 +10,8 @@ from model import GMMTrainer,GMMConvertor,f0_convert,GV_postfilter,synthesis
 from scipy.io import wavfile
 
 import pdb
+import time
+import matplotlib.pyplot as plt
 
 
 def feature_collect(spk, files, config,feature_path):
@@ -155,43 +157,59 @@ if __name__ == "__main__":
     
     
     cvgvstats = np.load(os.path.join(static_path,spk1+"2"+spk2+"_cvgvstats"+".npy"))
-    
-    
-    # org_wav = "/Users/herbertli/Documents/DS_10283_3061/vcc2018_training/VCC2SF1/10046.wav"
-    
-    org_wav = "/Users/herbertli/Downloads/DS_10283_3061/vcc2018_evaluation/VCC2SF1/30003.wav"
 
-    #org_wav = "/Users/herbertli/Documents/DS_10283_3061/hello_siri_22050.wav"
-    # org_wav = "/Users/herbertli/Documents/DS_10283_3061/iphone_hey_siri.wav"
+    counter = 0
+    times = []
+    file_durations = []
     
-    # org_wav = "/Users/herbertli/Documents/DS_10283_3061/testing2.wav"
-    
-    f0, mcep, npow ,ap = featureExtractor(org_wav,config_all["Feature"])
-    mcep_0th = mcep[:, 0]
-    
-    
-    cvf0 = f0_convert(f0, orgf0stats, tarf0stats)
-    
-    
-    cvmcep_wopow = mecp_convertor.convert(static_delta(mcep[:, 1:]),
-                                           cvtype=mecp_GMM_config["cvtype"])
-    cvmcep = np.c_[mcep_0th, cvmcep_wopow]
-    
-    
-    cvmcep_wGV = GV_postfilter(cvmcep,
-                               targvsats,
-                               cvgvstats=cvgvstats,
-                               alpha=config_all["GV_morph_coeff"],
-                               startdim=1)
-                                   
-    
-    wav = synthesis(cvf0,cvmcep_wGV,ap,config_all["Feature"])
-    
-    wav = np.clip(wav, -32768, 32767)
-    wavfile.write("conv_M1_30003.wav", config_all["Feature"]["fs"], wav.astype(np.int16))
+    with open('eval_vcc2sf1.txt') as f:
+        for line in f:
+            org_wav = line[:-1]
+            # org_wav = "/Users/herbertli/Downloads/DS_10283_3061/vcc2018_evaluation/VCC2SF1/30003.wav"
+            source_rate, source_sig = wavfile.read(org_wav)
+            duration_second = len(source_sig) / float(source_rate)
+            file_durations.append(duration_second)
+            t1 = time.time()
+            
+            f0, mcep, npow ,ap = featureExtractor(org_wav,config_all["Feature"])
+            mcep_0th = mcep[:, 0]
+            
+            
+            cvf0 = f0_convert(f0, orgf0stats, tarf0stats)
+            
+            
+            cvmcep_wopow = mecp_convertor.convert(static_delta(mcep[:, 1:]),
+                                                cvtype=mecp_GMM_config["cvtype"])
+            cvmcep = np.c_[mcep_0th, cvmcep_wopow]
+            
+            
+            cvmcep_wGV = GV_postfilter(cvmcep,
+                                    targvsats,
+                                    cvgvstats=cvgvstats,
+                                    alpha=config_all["GV_morph_coeff"],
+                                    startdim=1)
+                                        
+            
+            wav = synthesis(cvf0,cvmcep_wGV,ap,config_all["Feature"])
+            
+            wav = np.clip(wav, -32768, 32767)
+            t2 = time.time()
+            times.append(t2-t1)
+            # print(times)
+            filepath = os.path.join("output/", ("conv_2sm1_400" + str(counter) + ".wav"))
+            counter += 1
+            wavfile.write(filepath, config_all["Feature"]["fs"], wav.astype(np.int16))
   
     
-        
+    print("time taken to run voice conversions --------", times)
+    print("length of wav files ---------", file_durations)
+
+    plt.plot(file_durations, times)
+    plt.xlabel('wav file durations (s)')
+    plt.ylabel('voice conversion times (s)')
+    plt.savefig('voice_conversion_times.png')
+    plt.close()
+
     
     
     
